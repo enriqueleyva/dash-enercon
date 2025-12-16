@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Dashboard Ventas - ENERCON</title>
+
+		<!-- Tailwind CDN -->
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script>
+			tailwind.config = {
+				theme: {
+					extend: {
+						colors: {
+							fuelgreen: "#44B649",
+							fuelblue: "#2A479C",
+						},
+					},
+				},
+			};
+		</script>
+
+		<!-- PapaParse (CSV) -->
+		<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+		<!-- Chart.js -->
+		<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+		<style>
+			/* Scrollbar suave en tabla */
+			.table-wrap::-webkit-scrollbar {
+				height: 10px;
+				width: 10px;
+			}
+			.table-wrap::-webkit-scrollbar-thumb {
+				border-radius: 9999px;
+				background: rgba(0, 0, 0, 0.2);
+			}
+		</style>
+	</head>
+
+	<body class="bg-slate-50 text-slate-800">
+		<!-- Header -->
+		<header
+			class="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-slate-200"
+		>
+			<div
+				class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between"
+			>
+				<div class="flex items-center gap-3">
+					<div
+						class="h-9 w-9 rounded-xl bg-fuelblue text-white grid place-items-center font-bold"
+					>
+						E
+					</div>
+					<div>
+						<div class="font-semibold leading-tight">Dashboard de Ventas</div>
+					</div>
+				</div>
+
+				<div class="flex items-center gap-2">
+					<button
+						id="btnReset"
+						class="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm"
+					>
+						Limpiar filtros
+					</button>
+					<button
+						id="btnExport"
+						class="px-3 py-2 rounded-xl bg-fuelblue hover:opacity-90 text-white text-sm"
+					>
+						Exportar filtrado (CSV)
+					</button>
+				</div>
+			</div>
+		</header>
+
+		<main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+			<!-- Loader / status -->
+			<div
+				id="statusBar"
+				class="hidden rounded-2xl border border-slate-200 bg-white p-4"
+			>
+				<div class="flex items-center gap-3">
+					<div class="h-3 w-3 rounded-full bg-fuelgreen animate-pulse"></div>
+					<div class="text-sm">
+						<span class="font-medium">Procesando…</span>
+						<span id="statusText" class="text-slate-500">Leyendo archivo</span>
+					</div>
+				</div>
+			</div>
+
+			<!-- Panel: carga + filtros -->
+			<section class="rounded-2xl border border-slate-200 bg-white p-4">
+				<div
+					class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3"
+				>
+					<div>
+						<h2 class="font-semibold">Datos & Filtros</h2>
+						<p class="text-sm text-slate-500">
+							Carga tu CSV y filtra por fecha, producto, cliente, método de pago
+							y operación.
+						</p>
+					</div>
+
+					<div class="flex items-center gap-2">
+						<label
+							class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer text-sm"
+						>
+							<input id="fileInput" type="file" accept=".csv" class="hidden" />
+							<span class="font-medium">Cargar CSV</span>
+							<span id="fileName" class="text-slate-500">(sin archivo)</span>
+						</label>
+					</div>
+				</div>
+
+				<div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+					<div class="lg:col-span-1">
+						<label class="text-xs text-slate-500">Desde</label>
+						<input
+							id="fDateFrom"
+							type="date"
+							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+						/>
+					</div>
+					<div class="lg:col-span-1">
+						<label class="text-xs text-slate-500">Hasta</label>
+						<input
+							id="fDateTo"
+							type="date"
+							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+						/>
+					</div>
+
+					<div class="lg:col-span-1">
+						<label class="text-xs text-slate-500">Hora desde</label>
+						<select
+							id="fHoraFrom"
+							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+						>
+							<option value="__all__">Todas</option>
+						</select>
+					</div>
+
+					<div class="lg:col-span-1">
+						<label class="text-xs text-slate-500">Hora hasta</label>
+						<select
+							id="fHoraTo"
+							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+						>
+							<option value="__all__">Todas</option>
+						</select>
+					</div>
+
+					<div class="lg:col-span-1">
+						<label class="text-xs text-slate-500">Producto</label>
+						<select
+							id="fProducto"
+							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+						>
+							<option value="__all__">Todos</option>
+						</select>
+					</div>
+
+					<div class="lg:col-span-1">
+						<label class="text-xs text-slate-500">Método de pago (mop)</label>
+						<select
+							id="fMop"
+							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+						>
+							<option value="__all__">Todos</option>
+						</select>
+					</div>
+
+					<div class="lg:col-span-1">
+						<label class="text-xs text-slate-500">Tipo</label>
+						<select
+							id="fTipo"
+							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+						>
+							<option value="__all__">Todos</option>
+							<option value="1">Combustible (gasolina=1)</option>
+							<option value="0">Tienda/Adicional (gasolina=0)</option>
+						</select>
+					</div>
+
+					<div class="lg:col-span-1">
+						<label class="text-xs text-slate-500">Cliente</label>
+						<select
+							id="fCliente"
+							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+						>
+							<option value="__all__">Todos</option>
+						</select>
+					</div>
+
+					<div class="lg:col-span-2">
+						<label class="text-xs text-slate-500">Empleado</label>
+						<select
+							id="fEmpleado"
+							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+						>
+							<option value="__all__">Todos</option>
+						</select>
+					</div>
+
+					<div class="lg:col-span-2">
+						<label class="text-xs text-slate-500">Isla</label>
+						<select
+							id="fIsla"
+							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+						>
+							<option value="__all__">Todas</option>
+						</select>
+					</div>
+
+					<div class="lg:col-span-2">
+						<label class="text-xs text-slate-500">Turno</label>
+						<select
+							id="fTurno"
+							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+						>
+							<option value="__all__">Todos</option>
+						</select>
+					</div>
+				</div>
+
+				<div
+					class="mt-4 text-xs text-slate-500 flex flex-wrap items-center gap-3"
+				>
+					<div>
+						<span class="font-medium text-slate-700">Rows:</span>
+						<span id="metaRows">—</span>
+					</div>
+					<div>
+						<span class="font-medium text-slate-700">Transacciones:</span>
+						<span id="metaTx">—</span>
+					</div>
+					<div>
+						<span class="font-medium text-slate-700">Rango:</span>
+						<span id="metaRange">—</span>
+					</div>
+				</div>
+			</section>
+
+			<!-- KPIs -->
+			<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="text-xs text-slate-500">Ventas</div>
+					<div id="kpiVentas" class="mt-1 text-xl font-semibold">—</div>
+				</div>
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="text-xs text-slate-500">Volumen (cantidad)</div>
+					<div id="kpiVolumen" class="mt-1 text-xl font-semibold">—</div>
+				</div>
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="text-xs text-slate-500"># Tickets</div>
+					<div id="kpiTickets" class="mt-1 text-xl font-semibold">—</div>
+				</div>
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="text-xs text-slate-500">Ticket promedio</div>
+					<div id="kpiTicketAvg" class="mt-1 text-xl font-semibold">—</div>
+				</div>
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="text-xs text-slate-500">Precio prom. ponderado</div>
+					<div id="kpiPrecioPond" class="mt-1 text-xl font-semibold">—</div>
+				</div>
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="text-xs text-slate-500">Top producto</div>
+					<div id="kpiTopProd" class="mt-1 text-xl font-semibold">—</div>
+				</div>
+			</section>
+
+			<!-- Charts -->
+			<section class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="flex items-center justify-between">
+						<h3 class="font-semibold">Ventas por día</h3>
+						<span class="text-xs text-slate-500">Σ importe</span>
+					</div>
+					<div class="mt-3">
+						<canvas id="chartVentasDia" height="140"></canvas>
+					</div>
+				</div>
+
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="flex items-center justify-between">
+						<h3 class="font-semibold">Top productos</h3>
+						<span class="text-xs text-slate-500">Top 10 por ventas</span>
+					</div>
+					<div class="mt-3">
+						<canvas id="chartTopProductos" height="140"></canvas>
+					</div>
+				</div>
+
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="flex items-center justify-between">
+						<h3 class="font-semibold">Método de pago</h3>
+						<span class="text-xs text-slate-500">Distribución ventas</span>
+					</div>
+					<div class="mt-3">
+						<canvas id="chartMop" height="140"></canvas>
+					</div>
+				</div>
+
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="flex items-center justify-between">
+						<h3 class="font-semibold">Top clientes</h3>
+						<span class="text-xs text-slate-500">Top 10 por ventas</span>
+					</div>
+					<div class="mt-3">
+						<canvas id="chartTopClientes" height="140"></canvas>
+					</div>
+				</div>
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="flex items-center justify-between">
+						<h3 class="font-semibold">Ventas por hora</h3>
+						<span class="text-xs text-slate-500">Σ importe</span>
+					</div>
+					<div class="mt-3">
+						<canvas id="chartVentasHora" height="140"></canvas>
+					</div>
+				</div>
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="flex items-center justify-between">
+						<h3 class="font-semibold">Ventas por vendedor</h3>
+						<span class="text-xs text-slate-500">Top 10 por ventas</span>
+					</div>
+					<div class="mt-3">
+						<canvas id="chartVentasVendedor" height="140"></canvas>
+					</div>
+				</div>
+
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="flex items-center justify-between">
+						<h3 class="font-semibold">Ventas por estación</h3>
+						<span class="text-xs text-slate-500">Top 10 por ventas</span>
+					</div>
+					<div class="mt-3">
+						<canvas id="chartVentasEstacion" height="140"></canvas>
+					</div>
+				</div>
+
+				<div class="rounded-2xl border border-slate-200 bg-white p-4">
+					<div class="flex items-center justify-between">
+						<h3 id="qtyTitle" class="font-semibold">Cantidad por día</h3>
+						<span id="qtySubtitle" class="text-xs text-slate-500"
+							>Σ cantidad</span
+						>
+					</div>
+					<div class="mt-3">
+						<canvas id="chartCantidadProducto" height="140"></canvas>
+					</div>
+				</div>
+			</section>
+		</main>
+
+		<script>
+			// -----------------------------
+			// Estado global
+			// -----------------------------
+			let RAW = []; // filas normalizadas
+			let FILTERED = []; // resultado de filtros
+			let sortField = "fecha_dt";
+			let sortDir = "desc"; // asc|desc
+			let charts = {
+				ventasDia: null,
+				topProductos: null,
+				mop: null,
+				topClientes: null,
+				ventasHora: null,
+				ventasVendedor: null,
+				ventasEstacion: null,
+				unidad: null,
+				cantidadProducto: null,
+			};
+
+			const COLS = [
+				{ key: "fechaStr", label: "Fecha" },
+				{ key: "hora", label: "Hora" },
+				{ key: "transaccion", label: "Transacción" },
+				{ key: "producto", label: "Producto" },
+				{ key: "cantidad", label: "Cantidad", fmt: "num" },
+				{ key: "precio", label: "Precio", fmt: "money" },
+				{ key: "importe", label: "Importe", fmt: "money" },
+				{ key: "mop", label: "MOP" },
+				{ key: "nombre", label: "Cliente" },
+				{ key: "empleado", label: "Empleado" },
+				{ key: "isla", label: "Isla" },
+				{ key: "turno", label: "Turno" },
+				{ key: "gasolina", label: "Gasolina" },
+			];
+
+			// -----------------------------
+			// Helpers
+			// -----------------------------
+			const $ = (id) => document.getElementById(id);
+
+			function showStatus(text) {
+				$("statusBar").classList.remove("hidden");
+				$("statusText").textContent = " " + (text || "");
+			}
+			function hideStatus() {
+				$("statusBar").classList.add("hidden");
+				$("statusText").textContent = "";
+			}
+
+			function toStr(v) {
+				if (v === null || v === undefined) return "";
+				return String(v).trim();
+			}
+
+			function parseNumber(v) {
+				const s = toStr(v).replace(/\s/g, "").replace(/,/g, ""); // por si vienen separadores de miles
+				const n = Number(s);
+				return Number.isFinite(n) ? n : 0;
+			}
+
+			function parseDateSmart(dateStr) {
+				// Preferido: YYYY-MM-DD
+				const s = toStr(dateStr);
+				if (!s) return null;
+
+				// YYYY-MM-DD
+				if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+					const d = new Date(s + "T00:00:00");
+					return isNaN(d.getTime()) ? null : d;
+				}
+
+				// DD/MM/YYYY o DD-MM-YYYY
+				const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+				if (m) {
+					const dd = String(m[1]).padStart(2, "0");
+					const mm = String(m[2]).padStart(2, "0");
+					const yyyy = m[3];
+					const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+					return isNaN(d.getTime()) ? null : d;
+				}
+
+				const d = new Date(s);
+				return isNaN(d.getTime()) ? null : d;
+			}
+
+			function formatMoney(n) {
+				if (!Number.isFinite(n)) return "—";
+				return new Intl.NumberFormat("es-MX", {
+					style: "currency",
+					currency: "MXN",
+					maximumFractionDigits: 2,
+				}).format(n);
+			}
+
+			function formatNum(n) {
+				if (!Number.isFinite(n)) return "—";
+				return new Intl.NumberFormat("es-MX", {
+					maximumFractionDigits: 2,
+				}).format(n);
+			}
+
+			function uniq(arr) {
+				return Array.from(new Set(arr.filter((v) => toStr(v) !== ""))).sort(
+					(a, b) => String(a).localeCompare(String(b))
+				);
+			}
+
+			function groupSum(rows, keyFn, valueFn) {
+				const map = new Map();
+				for (const r of rows) {
+					const k = keyFn(r);
+					if (!k) continue;
+					const v = valueFn(r);
+					map.set(k, (map.get(k) || 0) + v);
+				}
+				return map;
+			}
+
+			function topNFromMap(map, n = 10) {
+				return Array.from(map.entries())
+					.sort((a, b) => b[1] - a[1])
+					.slice(0, n);
+			}
+
+			function safeLower(s) {
+				return toStr(s).toLowerCase();
+			}
+
+			function buildDateStr(d) {
+				const yyyy = d.getFullYear();
+				const mm = String(d.getMonth() + 1).padStart(2, "0");
+				const dd = String(d.getDate()).padStart(2, "0");
+				return `${yyyy}-${mm}-${dd}`;
+			}
+
+			function getUnitLabel(rows) {
+				// 1) si existe "unidad" en datos (modo)
+				const units = rows.map((r) => toStr(r.unidad)).filter(Boolean);
+				if (units.length) {
+					const freq = new Map();
+					for (const u of units) freq.set(u, (freq.get(u) || 0) + 1);
+					return Array.from(freq.entries()).sort((a, b) => b[1] - a[1])[0][0];
+				}
+
+				// 2) si no hay "unidad", inferir por gasolina (mayoría)
+				const withGas = rows.filter((r) => toStr(r.gasolina) !== "");
+				if (!withGas.length) return "Cantidad";
+				const fuels = withGas.filter((r) => String(r.gasolina) === "1").length;
+				return fuels / withGas.length >= 0.5 ? "Litros" : "Unidades";
+			}
+
+			// -----------------------------
+			// Normalización CSV (ajusta si cambian headers)
+			// -----------------------------
+			function normalizeRow(row) {
+				// Soportar headers que vengan con espacios o may/min
+				// Intentamos por nombre exacto primero, si no, buscamos una key compatible
+				const keys = Object.keys(row || {});
+				const get = (wanted) => {
+					// exact
+					if (wanted in row) return row[wanted];
+					// case/trim match
+					const found = keys.find(
+						(k) => k.trim().toLowerCase() === wanted.trim().toLowerCase()
+					);
+					return found ? row[found] : "";
+				};
+				const getAny = (...names) => {
+					for (const n of names) {
+						const v = toStr(get(n));
+						if (v) return v;
+					}
+					return "";
+				};
+
+				const fechaRaw = getAny("fecha");
+				const horaRaw = getAny("hora");
+				const fecha = parseDateSmart(fechaRaw);
+				const hora = toStr(horaRaw);
+
+				// fecha_dt: combinar fecha+hora si existe
+				let fecha_dt = null;
+				if (fecha) {
+					if (hora && /^\d{1,2}:\d{2}(:\d{2})?$/.test(hora)) {
+						const hhmmss = hora.length === 5 ? hora + ":00" : hora;
+						const d = new Date(buildDateStr(fecha) + "T" + hhmmss);
+						fecha_dt = isNaN(d.getTime()) ? fecha : d;
+					} else {
+						fecha_dt = fecha;
+					}
+				}
+
+				// Extraer hora (0-23) desde "hora" (HH:MM o HH:MM:SS)
+				let hora_num = null;
+				if (hora && /^\d{1,2}:\d{2}(:\d{2})?$/.test(hora)) {
+					hora_num = parseInt(hora.split(":")[0], 10);
+					if (!Number.isFinite(hora_num) || hora_num < 0 || hora_num > 23) {
+						hora_num = null;
+					}
+				}
+				// Si no viene hora, intentar desde fecha_dt (si trae tiempo)
+				if (hora_num === null && fecha_dt instanceof Date) {
+					const h = fecha_dt.getHours();
+					if (Number.isFinite(h)) hora_num = h;
+				}
+				const hora_label =
+					hora_num === null ? "" : String(hora_num).padStart(2, "0");
+
+				const gasolinaRaw = get("gasolina");
+				const gasolina =
+					toStr(gasolinaRaw) === "" ? "" : parseNumber(gasolinaRaw);
+
+				const estacion = getAny("estacion", "estación") || toStr(get("isla"));
+
+				return {
+					// base
+					fecha_dt,
+					fechaStr: fecha ? buildDateStr(fecha) : "",
+					hora,
+					hora_num,
+					hora_label,
+
+					// campos analíticos
+					transaccion: toStr(get("transaccion")),
+					producto: toStr(get("producto")),
+					cantidad: parseNumber(get("cantidad")),
+					precio: parseNumber(get("precio")),
+					importe: parseNumber(get("importe")),
+					mop: toStr(get("mop")),
+
+					// dimensiones
+					nombre: toStr(get("nombre")),
+					empleado: toStr(getAny("empleado", "vendedor", "despachador")),
+					usuario: toStr(get("usuario")),
+					isla: toStr(get("isla")),
+					estacion,
+					posicion: toStr(get("posicion")),
+					turno: toStr(get("turno")),
+					unidad: toStr(get("unidad")),
+
+					// bandera
+					gasolina,
+
+					// guardar original por si exportas más columnas luego
+					__raw: row,
+				};
+			}
+			// -----------------------------
+			// UI: Opciones de filtros
+			// -----------------------------
+			function fillSelect(selectEl, values, labelAll) {
+				const cur = selectEl.value;
+				selectEl.innerHTML = "";
+				const optAll = document.createElement("option");
+				optAll.value = "__all__";
+				optAll.textContent = labelAll || "Todos";
+				selectEl.appendChild(optAll);
+
+				for (const v of values) {
+					const opt = document.createElement("option");
+					opt.value = v;
+					opt.textContent = v;
+					selectEl.appendChild(opt);
+				}
+
+				// mantener selección si existe
+				if (cur && [...selectEl.options].some((o) => o.value === cur))
+					selectEl.value = cur;
+			}
+
+			function updateFilterOptions() {
+				fillSelect($("fProducto"), uniq(RAW.map((r) => r.producto)), "Todos");
+				fillSelect($("fMop"), uniq(RAW.map((r) => r.mop)), "Todos");
+				fillSelect($("fCliente"), uniq(RAW.map((r) => r.nombre)), "Todos");
+				// Si hay registros sin cliente, añadir opción
+				const hasEmptyClient = RAW.some((r) => !toStr(r.nombre));
+				if (hasEmptyClient) {
+					const opt = document.createElement("option");
+					opt.value = "__empty__";
+					opt.textContent = "(Sin cliente)";
+					$("fCliente").appendChild(opt);
+				}
+				fillSelect($("fEmpleado"), uniq(RAW.map((r) => r.empleado)), "Todos");
+				fillSelect($("fIsla"), uniq(RAW.map((r) => r.isla)), "Todas");
+				fillSelect($("fTurno"), uniq(RAW.map((r) => r.turno)), "Todos");
+
+				// rango fechas → sugerir en inputs
+				const dates = RAW.map((r) => r.fecha_dt)
+					.filter(Boolean)
+					.sort((a, b) => a - b);
+				if (dates.length) {
+					const min = buildDateStr(dates[0]);
+					const max = buildDateStr(dates[dates.length - 1]);
+
+					if (!$("fDateFrom").value) $("fDateFrom").value = min;
+					if (!$("fDateTo").value) $("fDateTo").value = max;
+
+					$("metaRange").textContent = `${min} → ${max}`;
+				} else {
+					$("metaRange").textContent = "—";
+				}
+
+				$("metaRows").textContent = RAW.length ? formatNum(RAW.length) : "—";
+				$("metaTx").textContent = RAW.length
+					? formatNum(
+							new Set(RAW.map((r) => r.transaccion).filter(Boolean)).size
+					  )
+					: "—";
+				const hours = Array.from({ length: 24 }, (_, i) =>
+					String(i).padStart(2, "0")
+				);
+				fillSelect($("fHoraFrom"), hours, "Todas");
+				fillSelect($("fHoraTo"), hours, "Todas");
+			}
+
+			// -----------------------------
+			// Filtros + cálculo
+			// -----------------------------
+			function applyFilters() {
+				const hFrom = $("fHoraFrom").value;
+				const hTo = $("fHoraTo").value;
+
+				if (!RAW.length) {
+					FILTERED = [];
+					return;
+				}
+
+				const from = $("fDateFrom").value
+					? new Date($("fDateFrom").value + "T00:00:00")
+					: null;
+				const to = $("fDateTo").value
+					? new Date($("fDateTo").value + "T23:59:59")
+					: null;
+
+				const producto = $("fProducto").value;
+				const mop = $("fMop").value;
+				const tipo = $("fTipo").value; // gasolina
+				const cliente = $("fCliente").value;
+				const empleado = $("fEmpleado").value;
+				const isla = $("fIsla").value;
+				const turno = $("fTurno").value;
+
+				FILTERED = RAW.filter((r) => {
+					if (hFrom !== "__all__" || hTo !== "__all__") {
+						if (r.hora_num === null) return false; // si no hay hora, fuera cuando se filtra por hora
+						const hf = hFrom === "__all__" ? 0 : parseInt(hFrom, 10);
+						const ht = hTo === "__all__" ? 23 : parseInt(hTo, 10);
+
+						// rango simple (asume hf <= ht)
+						if (r.hora_num < hf || r.hora_num > ht) return false;
+					}
+
+					if (from && r.fecha_dt && r.fecha_dt < from) return false;
+					if (to && r.fecha_dt && r.fecha_dt > to) return false;
+
+					if (producto !== "__all__" && r.producto !== producto) return false;
+					if (mop !== "__all__" && r.mop !== mop) return false;
+
+					if (tipo !== "__all__") {
+						// si gasolina viene vacío en algunos registros, no los incluimos si filtras tipo
+						if (toStr(r.gasolina) === "") return false;
+						if (String(r.gasolina) !== tipo) return false;
+					}
+
+					if (empleado !== "__all__" && r.empleado !== empleado) return false;
+					if (isla !== "__all__" && r.isla !== isla) return false;
+					if (turno !== "__all__" && r.turno !== turno) return false;
+
+					if (cliente !== "__all__") {
+						if (cliente === "__empty__") {
+							if (toStr(r.nombre) !== "") return false;
+						} else {
+							if (r.nombre !== cliente) return false;
+						}
+					}
+
+					return true;
+				});
+
+				// Orden
+				FILTERED.sort((a, b) => {
+					const va = a[sortField];
+					const vb = b[sortField];
+
+					let cmp = 0;
+					if (va instanceof Date && vb instanceof Date) cmp = va - vb;
+					else if (typeof va === "number" && typeof vb === "number")
+						cmp = va - vb;
+					else cmp = String(va ?? "").localeCompare(String(vb ?? ""));
+
+					return sortDir === "asc" ? cmp : -cmp;
+				});
+			}
+
+			function computeKPIs(rows) {
+				const ventas = rows.reduce((acc, r) => acc + (r.importe || 0), 0);
+				const volumen = rows.reduce((acc, r) => acc + (r.cantidad || 0), 0);
+				const tickets = new Set(rows.map((r) => r.transaccion).filter(Boolean))
+					.size;
+				const ticketAvg = tickets ? ventas / tickets : 0;
+				const precioPond = volumen ? ventas / volumen : 0;
+
+				const prodMap = groupSum(
+					rows,
+					(r) => r.producto,
+					(r) => r.importe || 0
+				);
+				const topProd = topNFromMap(prodMap, 1)[0]?.[0] || "—";
+
+				return { ventas, volumen, tickets, ticketAvg, precioPond, topProd };
+			}
+
+			// -----------------------------
+			// Render KPIs
+			// -----------------------------
+			function renderKPIs(rows) {
+				const k = computeKPIs(rows);
+
+				$("kpiVentas").textContent = formatMoney(k.ventas);
+				$("kpiVolumen").textContent = formatNum(k.volumen);
+				$("kpiTickets").textContent = formatNum(k.tickets);
+				$("kpiTicketAvg").textContent = formatMoney(k.ticketAvg);
+				$("kpiPrecioPond").textContent = formatMoney(k.precioPond);
+				$("kpiTopProd").textContent = k.topProd;
+			}
+
+			// -----------------------------
+			// Charts
+			// -----------------------------
+			function destroyChart(ch) {
+				if (ch) ch.destroy();
+				return null;
+			}
+
+			function renderCharts(rows) {
+				// 1) Ventas por día
+				const byDay = groupSum(
+					rows,
+					(r) => r.fechaStr,
+					(r) => r.importe || 0
+				);
+				const dayKeys = Array.from(byDay.keys()).sort((a, b) =>
+					a.localeCompare(b)
+				);
+				const dayVals = dayKeys.map((k) => byDay.get(k) || 0);
+
+				charts.ventasDia = destroyChart(charts.ventasDia);
+				charts.ventasDia = new Chart($("chartVentasDia"), {
+					type: "line",
+					data: {
+						labels: dayKeys,
+						datasets: [{ label: "Ventas", data: dayVals, tension: 0.25 }],
+					},
+					options: {
+						responsive: true,
+						plugins: { legend: { display: false } },
+						scales: {
+							y: { ticks: { callback: (v) => formatMoney(v) } },
+						},
+					},
+				});
+
+				// 2) Top productos
+				const byProd = groupSum(
+					rows,
+					(r) => r.producto,
+					(r) => r.importe || 0
+				);
+				const topProd = topNFromMap(byProd, 10);
+				const prodLabels = topProd.map(([k]) => k);
+				const prodVals = topProd.map(([, v]) => v);
+
+				charts.topProductos = destroyChart(charts.topProductos);
+				charts.topProductos = new Chart($("chartTopProductos"), {
+					type: "bar",
+					data: {
+						labels: prodLabels,
+						datasets: [{ label: "Ventas", data: prodVals }],
+					},
+					options: {
+						responsive: true,
+						plugins: { legend: { display: false } },
+						scales: {
+							x: { ticks: { maxRotation: 45, minRotation: 0 } },
+							y: { ticks: { callback: (v) => formatMoney(v) } },
+						},
+					},
+				});
+
+				// 3) MOP (dona)
+				const byMop = groupSum(
+					rows,
+					(r) => r.mop || "SIN_MOP",
+					(r) => r.importe || 0
+				);
+				const mopPairs = Array.from(byMop.entries()).sort(
+					(a, b) => b[1] - a[1]
+				);
+				const mopLabels = mopPairs.map(([k]) => k);
+				const mopVals = mopPairs.map(([, v]) => v);
+
+				charts.mop = destroyChart(charts.mop);
+				charts.mop = new Chart($("chartMop"), {
+					type: "doughnut",
+					data: { labels: mopLabels, datasets: [{ data: mopVals }] },
+					options: {
+						responsive: true,
+						plugins: {
+							legend: { position: "bottom" },
+							tooltip: {
+								callbacks: {
+									label: (ctx) => `${ctx.label}: ${formatMoney(ctx.raw)}`,
+								},
+							},
+						},
+					},
+				});
+
+				// 4) Top clientes
+				const byCli = groupSum(
+					rows,
+					(r) => r.nombre || "SIN_CLIENTE",
+					(r) => r.importe || 0
+				);
+				const topCli = topNFromMap(byCli, 10);
+				const cliLabels = topCli.map(([k]) => k);
+				const cliVals = topCli.map(([, v]) => v);
+
+				charts.topClientes = destroyChart(charts.topClientes);
+				charts.topClientes = new Chart($("chartTopClientes"), {
+					type: "bar",
+					data: {
+						labels: cliLabels,
+						datasets: [{ label: "Ventas", data: cliVals }],
+					},
+					options: {
+						responsive: true,
+						plugins: { legend: { display: false } },
+						scales: {
+							x: { ticks: { maxRotation: 45, minRotation: 0 } },
+							y: { ticks: { callback: (v) => formatMoney(v) } },
+						},
+					},
+				});
+
+				// Ventas por hora (00-23)
+				const byHour = new Map();
+				for (let i = 0; i < 24; i++) byHour.set(String(i).padStart(2, "0"), 0);
+
+				for (const r of rows) {
+					if (r.hora_label) {
+						byHour.set(
+							r.hora_label,
+							(byHour.get(r.hora_label) || 0) + (r.importe || 0)
+						);
+					}
+				}
+				const hourLabels = Array.from(byHour.keys());
+				const hourVals = hourLabels.map((h) => byHour.get(h) || 0);
+
+				charts.ventasHora = destroyChart(charts.ventasHora);
+				charts.ventasHora = new Chart($("chartVentasHora"), {
+					type: "bar",
+					data: {
+						labels: hourLabels,
+						datasets: [{ label: "Ventas", data: hourVals }],
+					},
+					options: {
+						responsive: true,
+						plugins: { legend: { display: false } },
+						scales: {
+							y: { ticks: { callback: (v) => formatMoney(v) } },
+						},
+					},
+				});
+				// Ventas por vendedor (Top 10)
+				const byVend = groupSum(
+					rows,
+					(r) => r.empleado || r.usuario || "SIN_VENDEDOR",
+					(r) => r.importe || 0
+				);
+				const topVend = topNFromMap(byVend, 10);
+				const vendLabels = topVend.map(([k]) => k);
+				const vendVals = topVend.map(([, v]) => v);
+
+				charts.ventasVendedor = destroyChart(charts.ventasVendedor);
+				charts.ventasVendedor = new Chart($("chartVentasVendedor"), {
+					type: "bar",
+					data: {
+						labels: vendLabels,
+						datasets: [{ label: "Ventas", data: vendVals }],
+					},
+					options: {
+						responsive: true,
+						indexAxis: "y",
+						plugins: { legend: { display: false } },
+						scales: {
+							x: { ticks: { callback: (v) => formatMoney(v) } },
+						},
+					},
+				});
+
+				// Ventas por estación (Top 10)
+				const byEst = groupSum(
+					rows,
+					(r) => r.estacion || r.isla || "SIN_ESTACION",
+					(r) => r.importe || 0
+				);
+				const topEst = topNFromMap(byEst, 10);
+				const estLabels = topEst.map(([k]) => k);
+				const estVals = topEst.map(([, v]) => v);
+
+				charts.ventasEstacion = destroyChart(charts.ventasEstacion);
+				charts.ventasEstacion = new Chart($("chartVentasEstacion"), {
+					type: "bar",
+					data: {
+						labels: estLabels,
+						datasets: [{ label: "Ventas", data: estVals }],
+					},
+					options: {
+						responsive: true,
+						indexAxis: "y",
+						plugins: { legend: { display: false } },
+						scales: {
+							x: { ticks: { callback: (v) => formatMoney(v) } },
+						},
+					},
+				});
+
+				// Cantidad por día (del filtro actual)
+				const unitLabel = getUnitLabel(rows);
+
+				// Reusar los días que ya calculas arriba (byDay/dayKeys) si quieres.
+				// Si no, aquí lo calculamos directo:
+				const qtyByDay = groupSum(
+					rows,
+					(r) => r.fechaStr,
+					(r) => r.cantidad || 0
+				);
+				const qtyDays = Array.from(qtyByDay.keys()).sort((a, b) =>
+					a.localeCompare(b)
+				);
+				const qtyVals = qtyDays.map((d) => qtyByDay.get(d) || 0);
+
+				// Título según producto filtrado
+				const p = $("fProducto").value;
+				$("qtyTitle").textContent =
+					p !== "__all__"
+						? `Cantidad por día · ${p}`
+						: "Cantidad por día · Todos";
+				$("qtySubtitle").textContent = `Σ cantidad (${unitLabel})`;
+
+				charts.cantidadProducto = destroyChart(charts.cantidadProducto);
+				charts.cantidadProducto = new Chart($("chartCantidadProducto"), {
+					type: "line",
+					data: {
+						labels: qtyDays,
+						datasets: [{ label: unitLabel, data: qtyVals, tension: 0.25 }],
+					},
+					options: {
+						responsive: true,
+						plugins: { legend: { display: false } },
+						scales: {
+							y: { ticks: { callback: (v) => formatNum(v) } },
+						},
+					},
+				});
+			}
+
+			// -----------------------------
+			// Export CSV filtrado (columnas base)
+			// -----------------------------
+			function exportFilteredCSV() {
+				if (!FILTERED.length) return;
+
+				const headers = COLS.map((c) => c.key);
+				const lines = [headers.join(",")];
+
+				for (const r of FILTERED) {
+					const row = headers.map((k) => {
+						const val = r[k];
+						const s = toStr(val);
+						// escape csv
+						if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+							return `"${s.replace(/"/g, '""')}"`;
+						}
+						return s;
+					});
+					lines.push(row.join(","));
+				}
+
+				const blob = new Blob([lines.join("\n")], {
+					type: "text/csv;charset=utf-8;",
+				});
+				const url = URL.createObjectURL(blob);
+
+				const a = document.createElement("a");
+				a.href = url;
+				a.download = "ventas_filtrado.csv";
+				document.body.appendChild(a);
+				a.click();
+				a.remove();
+
+				URL.revokeObjectURL(url);
+			}
+
+			// -----------------------------
+			// Refresh general
+			// -----------------------------
+			function refresh() {
+				applyFilters();
+				renderKPIs(FILTERED);
+				renderCharts(FILTERED);
+			}
+
+			// -----------------------------
+			// Carga CSV
+			// -----------------------------
+			function parseCSVFile(file) {
+				showStatus("Leyendo CSV…");
+
+				Papa.parse(file, {
+					header: true,
+					skipEmptyLines: true,
+					complete: (results) => {
+						showStatus("Normalizando filas…");
+
+						const data = Array.isArray(results.data) ? results.data : [];
+						RAW = data
+							.map(normalizeRow)
+							.filter((r) => r.fechaStr || r.transaccion || r.producto);
+
+						updateFilterOptions();
+
+						hideStatus();
+						refresh();
+					},
+					error: (err) => {
+						hideStatus();
+						alert("Error al leer el CSV: " + (err?.message || err));
+					},
+				});
+			}
+
+			// -----------------------------
+			// Reset filtros
+			// -----------------------------
+			function resetFilters() {
+				// mantenemos fechas en rango si existen
+				$("fProducto").value = "__all__";
+				$("fMop").value = "__all__";
+				$("fTipo").value = "__all__";
+				$("fCliente").value = "__all__";
+				$("fEmpleado").value = "__all__";
+				$("fIsla").value = "__all__";
+				$("fTurno").value = "__all__";
+
+				// restablecer fechas a min/max del dataset
+				const dates = RAW.map((r) => r.fecha_dt)
+					.filter(Boolean)
+					.sort((a, b) => a - b);
+				if (dates.length) {
+					$("fDateFrom").value = buildDateStr(dates[0]);
+					$("fDateTo").value = buildDateStr(dates[dates.length - 1]);
+				} else {
+					$("fDateFrom").value = "";
+					$("fDateTo").value = "";
+				}
+
+				sortField = "fecha_dt";
+				sortDir = "desc";
+				const sh = $("sortHint");
+				if (sh) sh.textContent = `${sortField} (${sortDir})`;
+
+				refresh();
+			}
+
+			// -----------------------------
+			// Eventos
+			// -----------------------------
+			function wireEvents() {
+				$("fileInput").addEventListener("change", (e) => {
+					const file = e.target.files?.[0];
+					if (!file) return;
+					$("fileName").textContent = file.name;
+					parseCSVFile(file);
+				});
+
+				const filterIds = [
+					"fDateFrom",
+					"fDateTo",
+					"fHoraFrom",
+					"fHoraTo",
+					"fProducto",
+					"fMop",
+					"fTipo",
+					"fCliente",
+					"fEmpleado",
+					"fIsla",
+					"fTurno",
+				];
+				for (const id of filterIds) {
+					$(id).addEventListener("input", () => {
+						if (RAW.length) refresh();
+					});
+					$(id).addEventListener("change", () => {
+						if (RAW.length) refresh();
+					});
+				}
+
+				$("btnExport").addEventListener("click", exportFilteredCSV);
+				$("btnReset").addEventListener("click", resetFilters);
+			}
+
+			// Init
+			wireEvents();
+			// renderTableHead();
+		</script>
+	</body>
+</html>
