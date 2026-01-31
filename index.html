@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 	<head>
 		<meta charset="UTF-8" />
@@ -182,12 +182,18 @@
 
 					<div class="lg:col-span-1">
 						<label class="text-xs text-slate-500">Cliente</label>
-						<select
-							id="fCliente"
-							class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
-						>
-							<option value="__all__">Todos</option>
-						</select>
+						<div class="relative">
+							<input
+								id="fCliente"
+								placeholder="Todos"
+								autocomplete="off"
+								class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-fuelgreen/30"
+							/>
+							<div
+								id="fClienteList"
+								class="absolute left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg text-sm hidden z-10"
+							></div>
+						</div>
 					</div>
 
 					<div class="lg:col-span-2">
@@ -391,6 +397,8 @@
 			// Helpers
 			// -----------------------------
 			const $ = (id) => document.getElementById(id);
+			const EMPTY_CLIENT_LABEL = "(Sin cliente)";
+			let CLIENT_VALUES = [];
 
 			function showStatus(text) {
 				$("statusBar").classList.remove("hidden");
@@ -455,7 +463,7 @@
 
 			function uniq(arr) {
 				return Array.from(new Set(arr.filter((v) => toStr(v) !== ""))).sort(
-					(a, b) => String(a).localeCompare(String(b))
+					(a, b) => String(a).localeCompare(String(b)),
 				);
 			}
 
@@ -515,7 +523,7 @@
 					if (wanted in row) return row[wanted];
 					// case/trim match
 					const found = keys.find(
-						(k) => k.trim().toLowerCase() === wanted.trim().toLowerCase()
+						(k) => k.trim().toLowerCase() === wanted.trim().toLowerCase(),
 					);
 					return found ? row[found] : "";
 				};
@@ -622,18 +630,57 @@
 					selectEl.value = cur;
 			}
 
+			function renderClientSuggestions(query = "") {
+				const listEl = $("fClienteList");
+				const q = safeLower(query);
+				const suggestions = CLIENT_VALUES.filter((value) =>
+					safeLower(value).includes(q),
+				);
+				listEl.innerHTML = "";
+
+				if (!suggestions.length) {
+					listEl.classList.add("hidden");
+					return;
+				}
+
+				for (const value of suggestions) {
+					const button = document.createElement("button");
+					button.type = "button";
+					button.textContent = value;
+					button.className =
+						"w-full text-left px-3 py-2 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none";
+					button.addEventListener("click", () => {
+						$("fCliente").value = value;
+						listEl.classList.add("hidden");
+						if (RAW.length) refresh();
+					});
+					listEl.appendChild(button);
+				}
+
+				listEl.classList.remove("hidden");
+			}
+
 			function updateFilterOptions() {
 				fillSelect($("fProducto"), uniq(RAW.map((r) => r.producto)), "Todos");
 				fillSelect($("fMop"), uniq(RAW.map((r) => r.mop)), "Todos");
-				fillSelect($("fCliente"), uniq(RAW.map((r) => r.nombre)), "Todos");
+				// fillSelect($("fCliente"), uniq(RAW.map((r) => r.nombre)), "Todos");
+				const clientValues = uniq(RAW.map((r) => r.nombre));
+				// fillDatalist($("fClienteList"), clientValues, [EMPTY_CLIENT_LABEL]);
 				// Si hay registros sin cliente, añadir opción
 				const hasEmptyClient = RAW.some((r) => !toStr(r.nombre));
-				if (hasEmptyClient) {
-					const opt = document.createElement("option");
-					opt.value = "__empty__";
-					opt.textContent = "(Sin cliente)";
-					$("fCliente").appendChild(opt);
+				CLIENT_VALUES = hasEmptyClient
+					? [...clientValues, EMPTY_CLIENT_LABEL]
+					: clientValues;
+				const clientInput = $("fCliente");
+				const currentClient = toStr(clientInput.value);
+				if (
+					currentClient &&
+					currentClient !== EMPTY_CLIENT_LABEL &&
+					!CLIENT_VALUES.includes(currentClient)
+				) {
+					clientInput.value = "";
 				}
+				renderClientSuggestions(currentClient);
 				fillSelect($("fEmpleado"), uniq(RAW.map((r) => r.empleado)), "Todos");
 				fillSelect($("fIsla"), uniq(RAW.map((r) => r.isla)), "Todas");
 				fillSelect($("fTurno"), uniq(RAW.map((r) => r.turno)), "Todos");
@@ -657,11 +704,11 @@
 				$("metaRows").textContent = RAW.length ? formatNum(RAW.length) : "—";
 				$("metaTx").textContent = RAW.length
 					? formatNum(
-							new Set(RAW.map((r) => r.transaccion).filter(Boolean)).size
-					  )
+							new Set(RAW.map((r) => r.transaccion).filter(Boolean)).size,
+						)
 					: "—";
 				const hours = Array.from({ length: 24 }, (_, i) =>
-					String(i).padStart(2, "0")
+					String(i).padStart(2, "0"),
 				);
 				fillSelect($("fHoraFrom"), hours, "Todas");
 				fillSelect($("fHoraTo"), hours, "Todas");
@@ -689,7 +736,8 @@
 				const producto = $("fProducto").value;
 				const mop = $("fMop").value;
 				const tipo = $("fTipo").value; // gasolina
-				const cliente = $("fCliente").value;
+				// const cliente = $("fCliente").value;
+				const cliente = toStr($("fCliente").value);
 				const empleado = $("fEmpleado").value;
 				const isla = $("fIsla").value;
 				const turno = $("fTurno").value;
@@ -720,8 +768,8 @@
 					if (isla !== "__all__" && r.isla !== isla) return false;
 					if (turno !== "__all__" && r.turno !== turno) return false;
 
-					if (cliente !== "__all__") {
-						if (cliente === "__empty__") {
+					if (cliente) {
+						if (cliente === EMPTY_CLIENT_LABEL) {
 							if (toStr(r.nombre) !== "") return false;
 						} else {
 							if (r.nombre !== cliente) return false;
@@ -757,7 +805,7 @@
 				const prodMap = groupSum(
 					rows,
 					(r) => r.producto,
-					(r) => r.importe || 0
+					(r) => r.importe || 0,
 				);
 				const topProd = topNFromMap(prodMap, 1)[0]?.[0] || "—";
 
@@ -791,10 +839,10 @@
 				const byDay = groupSum(
 					rows,
 					(r) => r.fechaStr,
-					(r) => r.importe || 0
+					(r) => r.importe || 0,
 				);
 				const dayKeys = Array.from(byDay.keys()).sort((a, b) =>
-					a.localeCompare(b)
+					a.localeCompare(b),
 				);
 				const dayVals = dayKeys.map((k) => byDay.get(k) || 0);
 
@@ -818,7 +866,7 @@
 				const byProd = groupSum(
 					rows,
 					(r) => r.producto,
-					(r) => r.importe || 0
+					(r) => r.importe || 0,
 				);
 				const topProd = topNFromMap(byProd, 10);
 				const prodLabels = topProd.map(([k]) => k);
@@ -845,10 +893,10 @@
 				const byMop = groupSum(
 					rows,
 					(r) => r.mop || "SIN_MOP",
-					(r) => r.importe || 0
+					(r) => r.importe || 0,
 				);
 				const mopPairs = Array.from(byMop.entries()).sort(
-					(a, b) => b[1] - a[1]
+					(a, b) => b[1] - a[1],
 				);
 				const mopLabels = mopPairs.map(([k]) => k);
 				const mopVals = mopPairs.map(([, v]) => v);
@@ -874,7 +922,7 @@
 				const byCli = groupSum(
 					rows,
 					(r) => r.nombre || "SIN_CLIENTE",
-					(r) => r.importe || 0
+					(r) => r.importe || 0,
 				);
 				const topCli = topNFromMap(byCli, 10);
 				const cliLabels = topCli.map(([k]) => k);
@@ -905,7 +953,7 @@
 					if (r.hora_label) {
 						byHour.set(
 							r.hora_label,
-							(byHour.get(r.hora_label) || 0) + (r.importe || 0)
+							(byHour.get(r.hora_label) || 0) + (r.importe || 0),
 						);
 					}
 				}
@@ -931,7 +979,7 @@
 				const byVend = groupSum(
 					rows,
 					(r) => r.empleado || r.usuario || "SIN_VENDEDOR",
-					(r) => r.importe || 0
+					(r) => r.importe || 0,
 				);
 				const topVend = topNFromMap(byVend, 10);
 				const vendLabels = topVend.map(([k]) => k);
@@ -958,7 +1006,7 @@
 				const byEst = groupSum(
 					rows,
 					(r) => r.estacion || r.isla || "SIN_ESTACION",
-					(r) => r.importe || 0
+					(r) => r.importe || 0,
 				);
 				const topEst = topNFromMap(byEst, 10);
 				const estLabels = topEst.map(([k]) => k);
@@ -989,10 +1037,10 @@
 				const qtyByDay = groupSum(
 					rows,
 					(r) => r.fechaStr,
-					(r) => r.cantidad || 0
+					(r) => r.cantidad || 0,
 				);
 				const qtyDays = Array.from(qtyByDay.keys()).sort((a, b) =>
-					a.localeCompare(b)
+					a.localeCompare(b),
 				);
 				const qtyVals = qtyDays.map((d) => qtyByDay.get(d) || 0);
 
@@ -1104,7 +1152,8 @@
 				$("fProducto").value = "__all__";
 				$("fMop").value = "__all__";
 				$("fTipo").value = "__all__";
-				$("fCliente").value = "__all__";
+				// $("fCliente").value = "__all__";
+				$("fCliente").value = "";
 				$("fEmpleado").value = "__all__";
 				$("fIsla").value = "__all__";
 				$("fTurno").value = "__all__";
@@ -1138,6 +1187,29 @@
 					if (!file) return;
 					$("fileName").textContent = file.name;
 					parseCSVFile(file);
+				});
+
+				const clientInput = $("fCliente");
+				clientInput.addEventListener("input", (event) => {
+					renderClientSuggestions(event.target.value);
+				});
+				clientInput.addEventListener("focus", (event) => {
+					renderClientSuggestions(event.target.value);
+				});
+				clientInput.addEventListener("keydown", (event) => {
+					if (event.key === "Escape") {
+						$("fClienteList").classList.add("hidden");
+					}
+				});
+				document.addEventListener("click", (event) => {
+					const listEl = $("fClienteList");
+					if (
+						event.target !== clientInput &&
+						!clientInput.contains(event.target) &&
+						!listEl.contains(event.target)
+					) {
+						listEl.classList.add("hidden");
+					}
 				});
 
 				const filterIds = [
