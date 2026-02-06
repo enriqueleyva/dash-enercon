@@ -878,7 +878,7 @@
 				const prodMap = groupSum(
 					rows,
 					(r) => r.producto,
-					(r) => r.importe || 0,
+					(r) => r.cantidad || 0,
 				);
 				const topProd = topNFromMap(prodMap, 1)[0]?.[0] || "—";
 
@@ -908,11 +908,12 @@
 			}
 
 			function renderCharts(rows) {
+				const unitLabel = getUnitLabel(rows);
 				// 1) Ventas por día
 				const byDay = groupSum(
 					rows,
 					(r) => r.fechaStr,
-					(r) => r.importe || 0,
+					(r) => r.cantidad || 0,
 				);
 				const dayKeys = Array.from(byDay.keys()).sort((a, b) =>
 					a.localeCompare(b),
@@ -930,7 +931,7 @@
 						responsive: true,
 						plugins: { legend: { display: false } },
 						scales: {
-							y: { ticks: { callback: (v) => formatMoney(v) } },
+							y: { ticks: { callback: (v) => formatNum(v) } },
 						},
 					},
 				});
@@ -939,7 +940,7 @@
 				const byProd = groupSum(
 					rows,
 					(r) => r.producto,
-					(r) => r.importe || 0,
+					(r) => r.cantidad || 0,
 				);
 				const topProd = topNFromMap(byProd, 10);
 				const prodLabels = topProd.map(([k]) => k);
@@ -957,7 +958,7 @@
 						responsive: true,
 						plugins: { legend: { display: false } },
 						scales: {
-							x: { ticks: { callback: (v) => formatMoney(v) } },
+							x: { ticks: { callback: (v) => formatNum(v) } },
 							y: { ticks: { autoSkip: false } },
 						},
 					},
@@ -967,7 +968,7 @@
 				const byMop = groupSum(
 					rows,
 					(r) => r.mop || "SIN_MOP",
-					(r) => r.importe || 0,
+					(r) => r.cantidad || 0,
 				);
 				const mopPairs = Array.from(byMop.entries()).sort(
 					(a, b) => b[1] - a[1],
@@ -985,7 +986,8 @@
 							legend: { position: "bottom" },
 							tooltip: {
 								callbacks: {
-									label: (ctx) => `${ctx.label}: ${formatMoney(ctx.raw)}`,
+									label: (ctx) =>
+										`${ctx.label}: ${formatNum(ctx.raw)} ${unitLabel}`,
 								},
 							},
 						},
@@ -996,7 +998,7 @@
 				const byCli = groupSum(
 					rows,
 					(r) => r.nombre || "SIN_CLIENTE",
-					(r) => r.importe || 0,
+					(r) => r.cantidad || 0,
 				);
 				const topCli = topNFromMap(byCli, 10);
 				const cliLabels = topCli.map(([k]) => k);
@@ -1007,14 +1009,14 @@
 					type: "bar",
 					data: {
 						labels: cliLabels,
-						datasets: [{ label: "Ventas", data: cliVals }],
+						datasets: [{ label: unitLabel, data: cliVals }],
 					},
 					options: {
 						responsive: true,
 						plugins: { legend: { display: false } },
 						scales: {
 							x: { ticks: { maxRotation: 45, minRotation: 0 } },
-							y: { ticks: { callback: (v) => formatMoney(v) } },
+							y: { ticks: { callback: (v) => formatNum(v) } },
 						},
 					},
 				});
@@ -1027,7 +1029,7 @@
 					if (r.hora_label) {
 						byHour.set(
 							r.hora_label,
-							(byHour.get(r.hora_label) || 0) + (r.importe || 0),
+							(byHour.get(r.hora_label) || 0) + (r.cantidad || 0),
 						);
 					}
 				}
@@ -1039,7 +1041,7 @@
 					type: "bar",
 					data: {
 						labels: hourLabels,
-						datasets: [{ label: "Ventas", data: hourVals }],
+						datasets: [{ label: unitLabel, data: hourVals }],
 					},
 					options: {
 						responsive: true,
@@ -1107,7 +1109,7 @@
 				const byEst = groupSum(
 					rows,
 					(r) => r.estacion || r.isla || "SIN_ESTACION",
-					(r) => r.importe || 0,
+					(r) => r.cantidad || 0,
 				);
 				const topEst = topNFromMap(byEst, 10);
 				const estLabels = topEst.map(([k]) => k);
@@ -1131,7 +1133,7 @@
 				// });
 
 				// Cantidad por día (del filtro actual)
-				const unitLabel = getUnitLabel(rows);
+				// const unitLabel = getUnitLabel(rows);
 
 				// Reusar los días que ya calculas arriba (byDay/dayKeys) si quieres.
 				// Si no, aquí lo calculamos directo:
