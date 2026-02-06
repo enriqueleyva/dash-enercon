@@ -953,11 +953,12 @@
 						datasets: [{ label: "Ventas", data: prodVals }],
 					},
 					options: {
+						indexAxis: "y",
 						responsive: true,
 						plugins: { legend: { display: false } },
 						scales: {
-							x: { ticks: { maxRotation: 45, minRotation: 0 } },
-							y: { ticks: { callback: (v) => formatMoney(v) } },
+							x: { ticks: { callback: (v) => formatMoney(v) } },
+							y: { ticks: { autoSkip: false } },
 						},
 					},
 				});
