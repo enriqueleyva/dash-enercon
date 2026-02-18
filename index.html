@@ -454,7 +454,8 @@
 			const FONT_SCALE_MIN = 0.85;
 			const FONT_SCALE_MAX = 1.25;
 			const FONT_SCALE_STEP = 0.05;
-			const API_ENDPOINT = "http://216.225.203.100/api/c_venta_clientes"; // Endpoint GET
+			const API_ENDPOINT =
+				"https://script.google.com/macros/s/AKfycbw-Kjl-R8Pb46f13IIeuyKPBiWT3RstG0pbp-PQkpve1jf-32GIFSSg1t05UdDnK_Psbw/exec"; // Endpoint GET
 
 			function showStatus(text) {
 				$("statusBar").classList.remove("hidden");
@@ -1230,7 +1231,7 @@
 				showStatus("Consultando API…");
 				try {
 					const response = await fetch(API_ENDPOINT, {
-						method: "GET",
+						method: "POST",
 						headers: { Accept: "application/json" },
 					});
 					if (!response.ok) {
@@ -1254,8 +1255,9 @@
 
 					showStatus("Normalizando filas…");
 					const payload = await response.json();
-					const data = Array.isArray(payload?.data)
-						? payload.data
+					console.log("Respuesta API:", payload);
+					const data = Array.isArray(payload?.apiData.data)
+						? payload.apiData.data
 						: Array.isArray(payload)
 							? payload
 							: [];
