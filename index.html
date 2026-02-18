@@ -139,7 +139,9 @@
 						>
 							Actualizar datos
 						</button>
-						<span id="apiMeta" class="text-xs text-slate-500">(sin consulta)</span>
+						<span id="apiMeta" class="text-xs text-slate-500"
+							>(sin consulta)</span
+						>
 					</div>
 				</div>
 
@@ -398,6 +400,12 @@
 				</div>
 			</section>
 		</main>
+		<script
+			src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"
+			integrity="sha512-+NqPlbbtM1QqiK8ZAo4Yrj2c4lNQoGv8P79DPtKzj++l5jnN39rHA/xsqn8zE9l0uSoxaCdrOgFs6yjyfbBxSg=="
+			crossorigin="anonymous"
+			referrerpolicy="no-referrer"
+		></script>
 
 		<script>
 			// -----------------------------
@@ -446,7 +454,7 @@
 			const FONT_SCALE_MIN = 0.85;
 			const FONT_SCALE_MAX = 1.25;
 			const FONT_SCALE_STEP = 0.05;
-			const API_ENDPOINT = "https://tu-api.com/ventas"; // Endpoint GET
+			const API_ENDPOINT = "http://216.225.203.100/api/c_venta_clientes"; // Endpoint GET
 
 			function showStatus(text) {
 				$("statusBar").classList.remove("hidden");
@@ -1229,6 +1237,21 @@
 						throw new Error(`HTTP ${response.status} ${response.statusText}`);
 					}
 
+					// var settings = {
+					// 	url: API_ENDPOINT,
+					// 	type: "POST",
+					// 	data: JSON.stringify({}),
+					// 	success: function () {
+					// 		// resolve()
+					// 	},
+					// 	error: function () {
+					// 		btn48.removeAttribute("disabled");
+					// 		Swal.fire("Error de conexión", "", "info");
+					// 		reject();
+					// 	},
+					// };
+					// $.ajax(settings).done(function (response) {});
+
 					showStatus("Normalizando filas…");
 					const payload = await response.json();
 					const data = Array.isArray(payload?.data)
@@ -1251,6 +1274,7 @@
 					refresh();
 				} catch (err) {
 					hideStatus();
+
 					alert("Error al consultar el API (GET): " + (err?.message || err));
 				}
 			}
