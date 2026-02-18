@@ -20,8 +20,6 @@
 			};
 		</script>
 
-		<!-- PapaParse (CSV) -->
-		<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 		<!-- Chart.js -->
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
@@ -128,19 +126,20 @@
 					<div>
 						<h2 class="font-semibold">Datos & Filtros</h2>
 						<p class="text-sm text-slate-500">
-							Carga tu CSV y filtra por fecha, producto, cliente, método de pago
-							y operación.
+							Consulta el API y filtra por fecha, producto, cliente, método de
+							pago y operación.
 						</p>
 					</div>
 
-					<div class="flex items-center gap-2">
-						<label
-							class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer text-sm"
+					<div class="flex flex-wrap items-center gap-2">
+						<button
+							id="btnLoadApi"
+							class="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm"
+							type="button"
 						>
-							<input id="fileInput" type="file" accept=".csv" class="hidden" />
-							<span class="font-medium">Cargar CSV</span>
-							<span id="fileName" class="text-slate-500">(sin archivo)</span>
-						</label>
+							Actualizar datos
+						</button>
+						<span id="apiMeta" class="text-xs text-slate-500">(sin consulta)</span>
 					</div>
 				</div>
 
@@ -447,6 +446,7 @@
 			const FONT_SCALE_MIN = 0.85;
 			const FONT_SCALE_MAX = 1.25;
 			const FONT_SCALE_STEP = 0.05;
+			const API_ENDPOINT = "https://tu-api.com/ventas"; // Endpoint GET
 
 			function showStatus(text) {
 				$("statusBar").classList.remove("hidden");
@@ -585,7 +585,7 @@
 			}
 
 			// -----------------------------
-			// Normalización CSV (ajusta si cambian headers)
+			// Normalización (API)
 			// -----------------------------
 			function normalizeRow(row) {
 				// Soportar headers que vengan con espacios o may/min
@@ -1216,33 +1216,43 @@
 				renderCharts(FILTERED);
 			}
 
+			// Carga API
 			// -----------------------------
-			// Carga CSV
-			// -----------------------------
-			function parseCSVFile(file) {
-				showStatus("Leyendo CSV…");
+			async function fetchApiData() {
+				showStatus("Consultando API…");
+				try {
+					const response = await fetch(API_ENDPOINT, {
+						method: "GET",
+						headers: { Accept: "application/json" },
+					});
+					if (!response.ok) {
+						throw new Error(`HTTP ${response.status} ${response.statusText}`);
+					}
 
-				Papa.parse(file, {
-					header: true,
-					skipEmptyLines: true,
-					complete: (results) => {
-						showStatus("Normalizando filas…");
+					showStatus("Normalizando filas…");
+					const payload = await response.json();
+					const data = Array.isArray(payload?.data)
+						? payload.data
+						: Array.isArray(payload)
+							? payload
+							: [];
 
-						const data = Array.isArray(results.data) ? results.data : [];
-						RAW = data
-							.map(normalizeRow)
-							.filter((r) => r.fechaStr || r.transaccion || r.producto);
+					RAW = data
+						.map(normalizeRow)
+						.filter((r) => r.fechaStr || r.transaccion || r.producto);
 
-						updateFilterOptions();
+					updateFilterOptions();
+					const apiCount = Number(payload?.count);
+					$("apiMeta").textContent = Number.isFinite(apiCount)
+						? `count API: ${formatNum(apiCount)} · rows leídas: ${formatNum(RAW.length)}`
+						: `rows leídas: ${formatNum(RAW.length)}`;
 
-						hideStatus();
-						refresh();
-					},
-					error: (err) => {
-						hideStatus();
-						alert("Error al leer el CSV: " + (err?.message || err));
-					},
-				});
+					hideStatus();
+					refresh();
+				} catch (err) {
+					hideStatus();
+					alert("Error al consultar el API (GET): " + (err?.message || err));
+				}
 			}
 
 			// -----------------------------
@@ -1283,11 +1293,8 @@
 			// Eventos
 			// -----------------------------
 			function wireEvents() {
-				$("fileInput").addEventListener("change", (e) => {
-					const file = e.target.files?.[0];
-					if (!file) return;
-					$("fileName").textContent = file.name;
-					parseCSVFile(file);
+				$("btnLoadApi").addEventListener("click", () => {
+					fetchApiData();
 				});
 
 				const clientInput = $("fCliente");
