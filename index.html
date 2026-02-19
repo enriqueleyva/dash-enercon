@@ -960,7 +960,7 @@
 					type: "bar",
 					data: {
 						labels: prodLabels,
-						datasets: [{ label: "Ventas", data: prodVals }],
+						datasets: [{ label: "Litros/Piezas", data: prodVals }],
 					},
 					options: {
 						indexAxis: "y",
@@ -1021,11 +1021,12 @@
 						datasets: [{ label: unitLabel, data: cliVals }],
 					},
 					options: {
+						indexAxis: "y",
 						responsive: true,
 						plugins: { legend: { display: false } },
 						scales: {
-							x: { ticks: { maxRotation: 45, minRotation: 0 } },
-							y: { ticks: { callback: (v) => formatNum(v) } },
+							x: { ticks: { callback: (v) => formatNum(v) } },
+							y: { ticks: { autoSkip: false } },
 						},
 					},
 				});
