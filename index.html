@@ -527,6 +527,47 @@
 				}).format(n);
 			}
 
+			const doughnutValueLabelsPlugin = {
+				id: "doughnutValueLabels",
+				afterDatasetsDraw(chart, _args, pluginOptions) {
+					if (chart.config.type !== "doughnut") return;
+
+					const dataset = chart.data.datasets?.[0];
+					const meta = chart.getDatasetMeta(0);
+					if (!dataset || !meta?.data?.length) return;
+
+					const ctx = chart.ctx;
+					ctx.save();
+					ctx.textAlign = "center";
+					ctx.textBaseline = "middle";
+					ctx.fillStyle = pluginOptions?.color || "#0f172a";
+
+					const formatter =
+						typeof pluginOptions?.formatter === "function"
+							? pluginOptions.formatter
+							: (value) => formatNum(value);
+
+					meta.data.forEach((arc, index) => {
+						const value = Number(dataset.data[index]);
+						if (!Number.isFinite(value) || value <= 0) return;
+
+						// Evita etiquetas ilegibles en segmentos demasiado pequeños
+						if (arc.circumference < 0.35) return;
+
+						const pos = arc.tooltipPosition();
+						const ringThickness = Math.max(arc.outerRadius - arc.innerRadius, 1);
+						const fontSize = Math.max(10, Math.min(14, ringThickness * 0.33));
+						ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
+
+						ctx.fillText(formatter(value, index, chart), pos.x, pos.y);
+					});
+
+					ctx.restore();
+				},
+			};
+
+			Chart.register(doughnutValueLabelsPlugin);
+
 			function uniq(arr) {
 				return Array.from(new Set(arr.filter((v) => toStr(v) !== ""))).sort(
 					(a, b) => String(a).localeCompare(String(b)),
